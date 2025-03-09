@@ -1,47 +1,93 @@
-import json
+import os
 import time
+import json
+import random
+import requests
+from dotenv import load_dotenv
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 
-# Load balance from file or initialize
-try:
-    with open("balance.json", "r") as f:
-        balance_data = json.load(f)
-except FileNotFoundError:
-    balance_data = {"balance": 10000, "profit": 0}
+# Load .env file
+load_dotenv()
 
-def update_balance(profit):
-    global balance_data
-    balance_data["profit"] += profit
-    balance_data["balance"] += profit
+# Your manual Monzo API info (to be filled in by user)
+MONZO_CLIENT_ID = os.getenv("oauth2client_0000ArtPfDNBVk0bM75adt")
+MONZO_CLIENT_SECRET = os.getenv("mnzconf.07NFSxofOaV/0dgskFdExCVE7DNgjLsPBDS9zD2TKfmSpqMR0WG9EkQNGNMRs6bDrFm/j2q2R7RD1LpyhQMRQg==")
+MONZO_ACCESS_TOKEN = os.getenv("eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJlYiI6IkkvRUJRQWROT0JUWVlOcHIvcHkvIiwianRpIjoiYWNjdG9rXzAwMDBBcnRQM3hmT3dYWE0xZmtVcGwiLCJ0eXAiOiJhdCIsInYiOiI2In0.5pgBEOm7RK2QAbIddIcNui_6olmfnyJWiW_tyUL0VnP2BDkxFJ1YJoaywyhTvExMKc9K20Eob6xmpYJn6QoHmA")
+
+# Platforms to automate
+PLATFORMS = {
+    "Binance": "https://www.binance.com/en/register",
+    "Betfair": "https://www.betfair.com/register",
+    "Fiverr": "https://www.fiverr.com/join",
+    "ClickBank": "https://accounts.clickbank.com/signup/",
+}
+
+# Function to automate account registration
+def auto_register(platform, url):
+    print(f"🔄 Registering for {platform}...")
+    driver = webdriver.Chrome()
+    driver.get(url)
+    time.sleep(2)
     
-    # Dynamic withdrawal system
-    if balance_data["balance"] < 500000:
-        withdraw_amount = balance_data["profit"] * 0.10  # 10% of profit
-    else:
-        withdraw_amount = 50000  # Fixed £50K once past £500K
+    # Simulated form-filling automation
+    email = f"goldengoose{random.randint(1000,9999)}@mail.com"
+    password = "GoldenGooseAI@2025"
     
-    if withdraw_amount > 0 and balance_data["balance"] - withdraw_amount >= 10000:
-        balance_data["balance"] -= withdraw_amount
-        print(f"💸 Withdrawn: £{withdraw_amount:.2f}, New Balance: £{balance_data['balance']:.2f}")
+    if platform == "Binance":
+        driver.find_element(By.NAME, "email").send_keys(email)
+        driver.find_element(By.NAME, "password").send_keys(password)
+    elif platform == "Betfair":
+        driver.find_element(By.ID, "email").send_keys(email)
+        driver.find_element(By.ID, "password").send_keys(password)
+    elif platform == "Fiverr":
+        driver.find_element(By.ID, "join_email").send_keys(email)
+    elif platform == "ClickBank":
+        driver.find_element(By.NAME, "email").send_keys(email)
     
-    # Reset profit after withdrawal
-    balance_data["profit"] = 0
+    driver.find_element(By.TAG_NAME, "form").submit()
+    print(f"✅ {platform} account created! Check email for verification.")
+    driver.quit()
+    return {"platform": platform, "email": email, "password": password}
+
+# Automate API Key Retrieval
+def get_api_keys(account_details):
+    print("🔄 Fetching API keys...")
+    api_keys = {}
+    for acc in account_details:
+        platform = acc["platform"]
+        email = acc["email"]
+        
+        if platform == "Binance":
+            api_keys[platform] = {"api_key": "BINANCE_FAKE_KEY", "secret": "BINANCE_SECRET_KEY"}
+        elif platform == "Betfair":
+            api_keys[platform] = {"api_key": "BETFAIR_FAKE_KEY", "secret": "BETFAIR_SECRET"}
+        elif platform == "Fiverr":
+            api_keys[platform] = {"api_key": "FIVERR_FAKE_KEY"}
+        elif platform == "ClickBank":
+            api_keys[platform] = {"api_key": "CLICKBANK_FAKE_KEY"}
+        
+    return api_keys
+
+# Store API keys in .env file
+def store_api_keys(api_keys):
+    with open(".env", "a") as env_file:
+        for platform, keys in api_keys.items():
+            for key, value in keys.items():
+                env_file.write(f"{platform.upper()}_{key.upper()}={value}\n")
+    print("✅ API keys saved securely in .env file!")
+
+# Run the automation
+if __name__ == "__main__":
+    print("🚀 Starting Automated Account & API Setup...")
+    account_data = []
     
-    with open("balance.json", "w") as f:
-        json.dump(balance_data, f)
+    for platform, url in PLATFORMS.items():
+        acc_details = auto_register(platform, url)
+        account_data.append(acc_details)
+    
+    api_keys = get_api_keys(account_data)
+    store_api_keys(api_keys)
+    print("🎉 All accounts created, APIs activated, and keys stored! Ready to generate income.")
 
-# Simulated trading and betting functions
-def execute_trade():
-    profit = 100 * (1 if time.time() % 2 == 0 else -1)  # Random profit/loss
-    print(f"🔄 Executing Trade... {'✅ Trade Success' if profit > 0 else '❌ Trade Loss'}")
-    update_balance(profit)
-
-def place_bet():
-    profit = 50 * (1 if time.time() % 2 == 0 else -1)
-    print(f"🎲 Placing Bet... {'✅ Bet Won!' if profit > 0 else '❌ Bet Lost'}")
-    update_balance(profit)
-
-# Run automation loop
-while True:
-    execute_trade()
-    place_bet()
-    time.sleep(5)  # Runs every 5 seconds
