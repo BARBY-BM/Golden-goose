@@ -1,0 +1,16 @@
+#!/bin/bash
+echo "Checking Network Issues..."
+
+# Restart Network
+sudo systemctl restart networking
+
+# Check Firewall
+echo "Checking Firewall Rules..."
+gcloud compute firewall-rules list --filter="name=allow-8080"
+
+# Restart Services
+echo "Restarting Services..."
+pkill -9 gunicorn
+nohup gunicorn --workers=4 --bind=0.0.0.0:8080 dashboard:app > dashboard.log 2>&1 &
+
+echo "Self-Repair Complete"
