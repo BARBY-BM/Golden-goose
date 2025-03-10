@@ -1,67 +1,90 @@
 import os
 import time
-import random
 import requests
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
-# Monzo API Credentials
+MONZO_CLIENT_ID = os.getenv("MONZO_CLIENT_ID")
+MONZO_CLIENT_SECRET = os.getenv("MONZO_CLIENT_SECRET")
 MONZO_ACCESS_TOKEN = os.getenv("MONZO_ACCESS_TOKEN")
 MONZO_ACCOUNT_ID = os.getenv("MONZO_ACCOUNT_ID")
-MONZO_POT_ID = os.getenv("MONZO_POT_ID")  # If using a Monzo pot
+MONZO_POT_ID = os.getenv("MONZO_POT_ID", None)  # Optional
+
+# Simulated balance tracking (would be replaced with real tracking from income sources)
+balance_data = {"balance": 10000.00, "profit": 0.00}
 
 
-def monzo_withdraw(amount):
-    """Withdraw funds by transferring them to a Monzo account."""
-    url = f"https://api.monzo.com/pots/{MONZO_POT_ID}/withdraw"
-
-    headers = {
-        "Authorization": f"Bearer {MONZO_ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-
-    data = {
-        "source_account_id": MONZO_ACCOUNT_ID,
-        "amount": int(amount * 100),  # Convert to pence
-        "dedupe_id": f"withdraw-{int(amount)}-{int(time.time())}"
-    }
-
-    response = requests.put(url, json=data, headers=headers)
-    
+def get_monzo_balance():
+    """Fetch current Monzo balance."""
+    url = f"https://api.monzo.com/balance?account_id={MONZO_ACCOUNT_ID}"
+    headers = {"Authorization": f"Bearer {MONZO_ACCESS_TOKEN}"}
+    response = requests.get(url, headers=headers)
     if response.status_code == 200:
-        print(f"💸 Successfully withdrew £{amount:.2f} to Monzo!")
+        return response.json().get("balance", 0) / 100  # Convert from pence to pounds
+    print("❌ Error fetching Monzo balance:", response.json())
+    return None
+
+
+def withdraw_to_monzo(amount):
+    """Withdraw funds from the system to Monzo."""
+    if MONZO_POT_ID:
+        url = f"https://api.monzo.com/pots/{MONZO_POT_ID}/withdraw"
+        data = {
+            "source_account_id": MONZO_ACCOUNT_ID,
+            "amount": int(amount * 100),  # Convert to pence
+            "dedupe_id": f"withdraw-{time.time()}"
+        }
     else:
-        print(f"❌ Monzo withdrawal failed: {response.json()}")
-
-
-# Simulating income generation from multiple streams
-def generate_income():
-    sources = {
-        "Freelancing": (500, 1000),
-        "Betting": (200, 800),
-        "Digital Sales": (300, 900),
-        "Trading": (400, 1000),
-        "Affiliate Marketing": (250, 700)
-    }
+        url = "https://api.monzo.com/feed"
+        data = {
+            "account_id": MONZO_ACCOUNT_ID,
+            "type": "basic",
+            "url": "https://www.monzo.com",
+            "title": "Automated Income Withdrawal",
+            "body": f"£{amount:.2f} transferred to Monzo.",
+            "amount": int(amount * 100)  # Convert to pence
+        }
     
-    balance = 10000  # Initial balance
-    while True:
-        for source, (low, high) in sources.items():
-            earnings = round(random.uniform(low, high), 2)
-            balance += earnings
-            print(f"💰 {source} Earned: £{earnings:.2f}, New Balance: £{balance:.2f}")
-            
-            # Withdraw excess funds over £10,000
-            if balance > 10500:
-                withdraw_amount = balance - 10000  # Withdraw the excess
-                monzo_withdraw(withdraw_amount)
-                balance -= withdraw_amount
+    headers = {"Authorization": f"Bearer {MONZO_ACCESS_TOKEN}"}
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code in [200, 201]:
+        print(f"💸 Withdrawn: £{amount:.2f}, New Balance: £{balance_data['balance']:.2f}")
+        balance_data["balance"] -= amount
+        balance_data["profit"] = 0  # Reset profit after withdrawal
+    else:
+        print("❌ Withdrawal failed:", response.json())
 
-        time.sleep(5)  # Runs every 5 seconds
+
+def run_income_automation():
+    """Simulates income generation and withdrawals."""
+    global balance_data
+    while True:
+        earned = {
+            "freelancing": round(500 + (200 * time.time() % 1), 2),
+            "betting": round(300 + (200 * time.time() % 1), 2),
+            "digital_sales": round(400 + (250 * time.time() % 1), 2),
+            "trading": round(350 + (300 * time.time() % 1), 2),
+            "affiliate_marketing": round(250 + (150 * time.time() % 1), 2)
+        }
+        
+        for source, amount in earned.items():
+            balance_data["balance"] += amount
+            balance_data["profit"] += amount
+            print(f"💰 {source.replace('_', ' ').title()} Earned: £{amount:.2f}, New Balance: £{balance_data['balance']:.2f}")
+        
+        # Withdraw logic: only if balance exceeds £10,500
+        if balance_data["balance"] > 10500:
+            withdraw_amount = balance_data["profit"] * 0.10  # Withdraw 10% of profit
+            if balance_data["balance"] > 500000:
+                withdraw_amount = 50000  # Fixed £50K withdrawals beyond £500K
+            if withdraw_amount > 0 and balance_data["balance"] - withdraw_amount >= 10000:
+                withdraw_to_monzo(withdraw_amount)
+        
+        time.sleep(5)  # Run every 5 seconds
 
 
 if __name__ == "__main__":
-    print("🚀 Starting Automated Income System with Monzo Integration...")
-    generate_income()
+    print("🚀 Starting Automated Income System...")
+    run_income_automation()
