@@ -9,6 +9,7 @@ load_dotenv()
 MONZO_ACCESS_TOKEN = os.getenv("MONZO_ACCESS_TOKEN")
 MONZO_ACCOUNT_ID = os.getenv("MONZO_ACCOUNT_ID")
 MONZO_POT_ID = os.getenv("MONZO_POT_ID", None)  # Optional
+MONZO_PAYEE_ID = os.getenv("MONZO_PAYEE_ID", None)  # Required for payments
 
 # Simulated balance tracking
 balance_data = {"balance": 10000.00, "profit": 0.00}
@@ -28,31 +29,30 @@ def get_monzo_balance():
 def withdraw_to_monzo(amount):
     """Withdraw funds from the system to Monzo."""
     headers = {"Authorization": f"Bearer {MONZO_ACCESS_TOKEN}"}
+    amount_pence = int(amount * 100)  # Convert to pence
 
-    # Convert amount to pence
-    amount_pence = int(amount * 100)
-
-    # If using a Monzo Pot, transfer funds from the pot
     if MONZO_POT_ID:
+        # Withdraw from a Monzo Pot
         url = f"https://api.monzo.com/pots/{MONZO_POT_ID}/withdraw"
         data = {
             "source_account_id": MONZO_ACCOUNT_ID,
             "amount": amount_pence,
             "dedupe_id": f"withdraw-{int(time.time())}"
         }
-    else:
-        # Direct transfer to Monzo via Feed Item (DOES NOT MOVE MONEY)
-        url = "https://api.monzo.com/feed"
+    elif MONZO_PAYEE_ID:
+        # Send money to a payee via Monzo Payments
+        url = "https://api.monzo.com/payments"
         data = {
             "account_id": MONZO_ACCOUNT_ID,
-            "type": "basic",
-            "url": "https://www.monzo.com",
-            "title": "Automated Income Withdrawal",
-            "body": f"£{amount:.2f} transferred to Monzo.",
-            "amount": amount_pence
+            "amount": amount_pence,
+            "payee_id": MONZO_PAYEE_ID,
+            "description": "Automated Income Withdrawal"
         }
+    else:
+        print("❌ No valid Monzo payment method (Pot ID or Payee ID required)")
+        return
 
-    print(f"🔄 Debug: Sending Withdrawal Request - {data}")  # Debugging statement
+    print(f"🔄 Debug: Sending Withdrawal Request - {data}")  # Debugging
 
     response = requests.post(url, headers=headers, json=data)
 
