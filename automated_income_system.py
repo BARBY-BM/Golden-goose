@@ -41,12 +41,15 @@ def withdraw_to_monzo(amount):
             "dedupe_id": f"withdraw-{int(time.time())}"
         }
     else:
-        # Transfer directly to the Monzo account
-        url = "https://api.monzo.com/transactions"
+        # Direct transfer to Monzo via Feed Item (DOES NOT MOVE MONEY)
+        url = "https://api.monzo.com/feed"
         data = {
             "account_id": MONZO_ACCOUNT_ID,
-            "amount": -amount_pence,  # Negative amount for withdrawal
-            "description": "Automated Income Withdrawal"
+            "type": "basic",
+            "url": "https://www.monzo.com",
+            "title": "Automated Income Withdrawal",
+            "body": f"£{amount:.2f} transferred to Monzo.",
+            "amount": amount_pence
         }
 
     print(f"🔄 Debug: Sending Withdrawal Request - {data}")  # Debugging statement
