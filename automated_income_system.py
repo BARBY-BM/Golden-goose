@@ -6,8 +6,6 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-MONZO_CLIENT_ID = os.getenv("MONZO_CLIENT_ID")
-MONZO_CLIENT_SECRET = os.getenv("MONZO_CLIENT_SECRET")
 MONZO_ACCESS_TOKEN = os.getenv("MONZO_ACCESS_TOKEN")
 MONZO_ACCOUNT_ID = os.getenv("MONZO_ACCOUNT_ID")
 MONZO_POT_ID = os.getenv("MONZO_POT_ID", None)  # Optional
@@ -30,26 +28,31 @@ def get_monzo_balance():
 def withdraw_to_monzo(amount):
     """Withdraw funds from the system to Monzo."""
     headers = {"Authorization": f"Bearer {MONZO_ACCESS_TOKEN}"}
-    
+
+    # Convert amount to pence
+    amount_pence = int(amount * 100)
+
+    # If using a Monzo Pot, transfer funds from the pot
     if MONZO_POT_ID:
         url = f"https://api.monzo.com/pots/{MONZO_POT_ID}/withdraw"
         data = {
             "source_account_id": MONZO_ACCOUNT_ID,
-            "amount": int(amount * 100),  # Convert to pence
+            "amount": amount_pence,
             "dedupe_id": f"withdraw-{int(time.time())}"
         }
     else:
+        # Transfer directly to the Monzo account
         url = "https://api.monzo.com/transactions"
         data = {
             "account_id": MONZO_ACCOUNT_ID,
-            "amount": int(amount * 100),  # Convert to pence
+            "amount": -amount_pence,  # Negative amount for withdrawal
             "description": "Automated Income Withdrawal"
         }
-    
+
     print(f"🔄 Debug: Sending Withdrawal Request - {data}")  # Debugging statement
-    
+
     response = requests.post(url, headers=headers, json=data)
-    
+
     if response.status_code in [200, 201]:
         print(f"💸 Withdrawn: £{amount:.2f}, New Balance: £{balance_data['balance']:.2f}")
         balance_data["balance"] -= amount
@@ -89,4 +92,3 @@ def run_income_automation():
 if __name__ == "__main__":
     print("🚀 Starting Automated Income System...")
     run_income_automation()
-
